@@ -5,7 +5,8 @@ export const testUser = {
   email: 'dev@payloadcms.com',
   password: 'test',
   name: 'Test User',
-}
+  role: 'admin',
+} as const
 
 /**
  * Seeds a test user for e2e admin tests.
