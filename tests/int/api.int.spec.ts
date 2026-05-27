@@ -17,4 +17,32 @@ describe('API', () => {
     })
     expect(users).toBeDefined()
   })
+
+  it('fetches columns', async () => {
+    const columns = await payload.find({
+      collection: 'columns',
+    })
+    expect(columns).toBeDefined()
+  })
+
+  it('fetches tasks', async () => {
+    const tasks = await payload.find({
+      collection: 'tasks',
+    })
+    expect(tasks).toBeDefined()
+  })
+
+  it('fetches boards', async () => {
+    const boards = await payload.find({
+      collection: 'boards',
+    })
+    expect(boards).toBeDefined()
+  })
+
+  it('fetches checklists', async () => {
+    const checklists = await payload.find({
+      collection: 'checklists',
+    })
+    expect(checklists).toBeDefined()
+  })
 })

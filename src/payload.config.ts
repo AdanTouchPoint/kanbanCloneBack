@@ -7,6 +7,10 @@ import sharp from 'sharp'
 
 import { Users } from './collections/Users'
 import { Media } from './collections/Media'
+import { Columns } from './collections/Columns'
+import { Tasks } from './collections/Tasks'
+import { Boards } from './collections/Boards'
+import { Checklists } from './collections/Checklists'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -18,9 +22,11 @@ export default buildConfig({
       baseDir: path.resolve(dirname),
     },
   },
-  collections: [Users, Media],
+  collections: [Users, Media, Columns, Tasks, Boards, Checklists],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
+  cors: '*',
+  csrf: ['http://localhost:3000', 'http://localhost:5173'],
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },

@@ -69,6 +69,10 @@ export interface Config {
   collections: {
     users: User;
     media: Media;
+    columns: Column;
+    tasks: Task;
+    boards: Board;
+    checklists: Checklist;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -78,6 +82,10 @@ export interface Config {
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    columns: ColumnsSelect<false> | ColumnsSelect<true>;
+    tasks: TasksSelect<false> | TasksSelect<true>;
+    boards: BoardsSelect<false> | BoardsSelect<true>;
+    checklists: ChecklistsSelect<false> | ChecklistsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -123,6 +131,8 @@ export interface UserAuthOperations {
  */
 export interface User {
   id: string;
+  name: string;
+  role: 'superadmin' | 'admin' | 'user';
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -163,6 +173,59 @@ export interface Media {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "columns".
+ */
+export interface Column {
+  id: string;
+  title: string;
+  color: 'purple' | 'blue' | 'warning' | 'success';
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tasks".
+ */
+export interface Task {
+  id: string;
+  name: string;
+  autorID: string | User;
+  state?: string | null;
+  due?: string | null;
+  checkListsID?: (string | Checklist)[] | null;
+  columnsID: string | Column;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "checklists".
+ */
+export interface Checklist {
+  id: string;
+  name: string;
+  due?: string | null;
+  state?: string | null;
+  membersID?: (string | User)[] | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "boards".
+ */
+export interface Board {
+  id: string;
+  name: string;
+  autorID: string | User;
+  membersID?: (string | User)[] | null;
+  tasksID?: (string | Task)[] | null;
+  columnsID?: (string | Column)[] | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -192,6 +255,22 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'media';
         value: string | Media;
+      } | null)
+    | ({
+        relationTo: 'columns';
+        value: string | Column;
+      } | null)
+    | ({
+        relationTo: 'tasks';
+        value: string | Task;
+      } | null)
+    | ({
+        relationTo: 'boards';
+        value: string | Board;
+      } | null)
+    | ({
+        relationTo: 'checklists';
+        value: string | Checklist;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -240,6 +319,8 @@ export interface PayloadMigration {
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
+  name?: T;
+  role?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -274,6 +355,55 @@ export interface MediaSelect<T extends boolean = true> {
   height?: T;
   focalX?: T;
   focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "columns_select".
+ */
+export interface ColumnsSelect<T extends boolean = true> {
+  title?: T;
+  color?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tasks_select".
+ */
+export interface TasksSelect<T extends boolean = true> {
+  name?: T;
+  autorID?: T;
+  state?: T;
+  due?: T;
+  checkListsID?: T;
+  columnsID?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "boards_select".
+ */
+export interface BoardsSelect<T extends boolean = true> {
+  name?: T;
+  autorID?: T;
+  membersID?: T;
+  tasksID?: T;
+  columnsID?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "checklists_select".
+ */
+export interface ChecklistsSelect<T extends boolean = true> {
+  name?: T;
+  due?: T;
+  state?: T;
+  membersID?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
