@@ -49,5 +49,10 @@ export const Tasks: CollectionConfig = {
       relationTo: 'columns',
       required: true,
     },
+    {
+      name: 'membersID',
+      type: 'relationship',
+      relationTo: 'users',
+    }
   ],
 }

@@ -194,6 +194,7 @@ export interface Task {
   due?: string | null;
   checkListsID?: (string | Checklist)[] | null;
   columnsID: string | Column;
+  membersID?: (string | null) | User;
   updatedAt: string;
   createdAt: string;
 }
@@ -377,6 +378,7 @@ export interface TasksSelect<T extends boolean = true> {
   due?: T;
   checkListsID?: T;
   columnsID?: T;
+  membersID?: T;
   updatedAt?: T;
   createdAt?: T;
 }
