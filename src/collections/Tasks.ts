@@ -55,31 +55,38 @@ export const Tasks: CollectionConfig = {
       relationTo: 'users',
     }
   ],
-  hooks: {
+hooks: {
     afterChange: [
-      async ({ doc, previousDoc, operation }) => {
-        // 1. Verificar si es una nueva asignación o si el colaborador cambió
-        const prevMembers = previousDoc?.membersID || [];
-        const currentMembers = doc?.membersID || [];
+      async ({ doc, req, operation }) => {
+        try {
+          // 1. Volver a consultar el documento usando la Local API para inflar las relaciones (depth: 3)
+          const populatedTask = await req.payload.findByID({
+            collection: 'tasks',
+            id: doc.id,
+            depth: 3, // <--- Aquí defines la profundidad que necesitas
+            req,      // Pasar el request para mantener el contexto de usuario/permisos si aplica
+          });
 
-        // Comparamos si hay miembros nuevos asignados
-        const hasNewAssignment = currentMembers.some((id: string) => !prevMembers.includes(id));
-
-        if (operation === 'create' || hasNewAssignment) {
-          try {
-            // 2. Disparar el trigger hacia n8n
+          // 2. Opcional: Si quieres mantener tu lógica de "solo si hay miembros asignados"
+          // Como ahora está populado, 'membersID' podría ser un objeto. 
+          // Evaluamos si existe algún miembro asignado.
+          if (populatedTask.membersID) {
+            
+            // 3. Enviar a n8n el objeto completamente populado
             await fetch('https://n8n-n8n.n4k6yy.easypanel.host/webhook-test/62ad72ab-865f-4893-80fa-1c55d686d916', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 evento: 'colaborador_asignado',
-                tipo: 'tarea', // o 'subtarea' según la colección
-                task: doc
+                tipo: 'tarea',
+                task: populatedTask // <--- Enviamos el documento con depth 3
               }),
             });
-          } catch (error) {
-            console.error('Error enviando trigger a n8n:', error);
+
+            console.log('Webhook enviado a n8n con relaciones completas (depth 3)');
           }
+        } catch (error) {
+          console.error('Error en el hook afterChange al poblar datos o enviar a n8n:', error);
         }
       }
     ]
