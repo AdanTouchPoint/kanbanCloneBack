@@ -1,5 +1,134 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig,CollectionAfterChangeHook } from 'payload'
+// 1. Definir una interfaz local para indicarle a TypeScript qué estructura tienen tus subtareas
+interface SubtareaObjeto {
+  id: string;
+  name?: string;
+  due?: string;
+  state?: string;
+  membersID?: any;
+}
 
+const tasksAfterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, req, operation }) => {
+  try {
+    // Aseguramos que trate las listas como arrays de objetos o strings
+    const prevSubs = (previousDoc?.checkListsID || []) as Array<string | SubtareaObjeto>;
+    const currentSubs = (doc?.checkListsID || []) as Array<string | SubtareaObjeto>;
+
+    let subTaskAfectada: SubtareaObjeto | null = null;
+    let tipoEvento: 'tarea' | 'subtarea' = 'tarea';
+
+    if (operation === 'update') {
+      // Caso A: Se añadió una nueva subtarea al array
+      if (currentSubs.length > prevSubs.length) {
+        subTaskAfectada = currentSubs.find((sub) => {
+          // Type Guard: Si 'sub' es un string o no tiene id, lo ignoramos
+          if (!sub || typeof sub === 'string') return false;
+          
+          return !prevSubs.some((p) => {
+            if (!p || typeof p === 'string') return false;
+            return p.id === sub.id;
+          });
+        }) as SubtareaObjeto | undefined || null;
+
+        if (subTaskAfectada) tipoEvento = 'subtarea';
+      } 
+      // Caso B: El número de subtareas es igual, pero una cambió de estado o de asignado
+      else {
+        subTaskAfectada = currentSubs.find((sub) => {
+          if (!sub || typeof sub === 'string') return false;
+
+          const prevSub = prevSubs.find((p) => {
+            if (!p || typeof p === 'string') return false;
+            return p.id === sub.id;
+          }) as SubtareaObjeto | undefined;
+
+          if (!prevSub) return false;
+          
+          const miembroCambio = JSON.stringify(sub.membersID) !== JSON.stringify(prevSub.membersID);
+          const estadoCambio = sub.state !== prevSub.state;
+          
+          return miembroCambio || estadoCambio;
+        }) as SubtareaObjeto | undefined || null;
+        
+        if (subTaskAfectada) {
+          tipoEvento = 'subtarea';
+        }
+      }
+    } else if (operation === 'create') {
+      if (currentSubs.length > 0 && typeof currentSubs[0] !== 'string') {
+        subTaskAfectada = currentSubs[0] as SubtareaObjeto;
+        tipoEvento = 'subtarea';
+      }
+    }
+
+    // 2. Si el cambio ocurrió en una Subtarea
+    if (tipoEvento === 'subtarea' && subTaskAfectada && subTaskAfectada.id) {
+      const populatedTask = await req.payload.findByID({
+        collection: 'tasks',
+        id: doc.id,
+        depth: 3,
+        req,
+      });
+
+      const populatedSub = populatedTask.checkListsID?.find((s: any) => s && (typeof s !== 'string') && s.id === subTaskAfectada?.id) as any;
+
+      if (populatedSub) {
+        await fetch('https://n8n-n8n.n4k6yy.easypanel.host/webhook/62ad72ab-865f-4893-80fa-1c55d686d916', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            evento: 'colaborador_asignado',
+            tipo: 'subtarea',
+            subtask: {
+              id: populatedSub.id || 'unknown',
+              name: populatedSub.name || 'unknown',
+              due: populatedSub.due ||  'unknown',
+              state: populatedSub.state || 'unknown',
+              membersID: populatedSub.membersID || 'unknown' 
+            },
+            parentTask: {
+              id: doc.id,
+              name: doc.name
+            }
+          }),
+        });
+      }
+      return;
+    }
+
+    // 3. Si no fue cambio de subtarea, evaluar si cambió el asignado de la TAREA PADRE
+    const prevTaskMembers = previousDoc?.membersID || [];
+    const currentTaskMembers = doc?.membersID || [];
+    const taskMemberChanged = JSON.stringify(currentTaskMembers) !== JSON.stringify(prevTaskMembers);
+
+    if ((operation === 'create' || taskMemberChanged) && tipoEvento === 'tarea') {
+      const populatedTask = await req.payload.findByID({
+        collection: 'tasks',
+        id: doc.id,
+        depth: 3,
+        req,
+      });
+
+      await fetch('https://tu-instancia-n8n.com/webhook/id-de-tu-trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          evento: 'colaborador_asignado',
+          tipo: 'tarea',
+          task: {
+            id: populatedTask.id,
+            name: populatedTask.name,
+            due: populatedTask.due,
+            membersID: populatedTask.membersID 
+          }
+        }),
+      });
+    }
+
+  } catch (error) {
+    console.error('Error en el filtrado del hook afterChange:', error);
+  }
+};
 export const Tasks: CollectionConfig = {
   slug: 'tasks',
   admin: {
@@ -55,40 +184,6 @@ export const Tasks: CollectionConfig = {
       relationTo: 'users',
     }
   ],
-hooks: {
-    afterChange: [
-      async ({ doc, req, operation }) => {
-        try {
-          // 1. Volver a consultar el documento usando la Local API para inflar las relaciones (depth: 3)
-          const populatedTask = await req.payload.findByID({
-            collection: 'tasks',
-            id: doc.id,
-            depth: 3, // <--- Aquí defines la profundidad que necesitas
-            req,      // Pasar el request para mantener el contexto de usuario/permisos si aplica
-          });
-
-          // 2. Opcional: Si quieres mantener tu lógica de "solo si hay miembros asignados"
-          // Como ahora está populado, 'membersID' podría ser un objeto. 
-          // Evaluamos si existe algún miembro asignado.
-          if (populatedTask.membersID) {
-            
-            // 3. Enviar a n8n el objeto completamente populado
-            await fetch('https://n8n-n8n.n4k6yy.easypanel.host/webhook/62ad72ab-865f-4893-80fa-1c55d686d916', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                evento: 'colaborador_asignado',
-                tipo: 'tarea',
-                task: populatedTask // <--- Enviamos el documento con depth 3
-              }),
-            });
-
-            console.log('Webhook enviado a n8n con relaciones completas (depth 3)');
-          }
-        } catch (error) {
-          console.error('Error en el hook afterChange al poblar datos o enviar a n8n:', error);
-        }
-      }
-    ]
+  hooks: {
   }
 }
