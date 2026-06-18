@@ -185,5 +185,6 @@ export const Tasks: CollectionConfig = {
     }
   ],
   hooks: {
+    afterChange: [tasksAfterChangeHook]
   }
 }
