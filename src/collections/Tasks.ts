@@ -73,7 +73,7 @@ hooks: {
           if (populatedTask.membersID) {
             
             // 3. Enviar a n8n el objeto completamente populado
-            await fetch('https://n8n-n8n.n4k6yy.easypanel.host/webhook-test/62ad72ab-865f-4893-80fa-1c55d686d916', {
+            await fetch('https://n8n-n8n.n4k6yy.easypanel.host/webhook/62ad72ab-865f-4893-80fa-1c55d686d916', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
