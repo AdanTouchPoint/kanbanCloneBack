@@ -111,7 +111,7 @@ const tasksAfterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDo
         req,
       });
 
-      const urlWebhook = 'https://tu-instancia-n8n.com/webhook/id-de-tu-trigger';
+      const urlWebhook = 'https://n8n-n8n.n4k6yy.easypanel.host/webhook/62ad72ab-865f-4893-80fa-1c55d686d916';
 
       if (tipoEvento === 'subtarea' && subTaskAfectada) {
         const populatedSub = populatedTask.checkListsID?.find(
