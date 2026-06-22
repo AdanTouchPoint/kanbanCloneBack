@@ -25,7 +25,7 @@ const boardsAfterChangeHook: CollectionAfterChangeHook = async ({ doc, previousD
     }
 
     if (idsAgregados.length > 0) {
-      const urlWebhook = 'https://n8n-n8n.n4k6yy.easypanel.host/webhook/30adf4b5-6c31-403e-8dd1-2a5e09651b77';
+      const urlWebhook = 'https://n8n-n8n.n4k6yy.easypanel.host/webhook-test/30adf4b5-6c31-403e-8dd1-2a5e09651b77';
 
       for (const userId of idsAgregados) {
         try {
