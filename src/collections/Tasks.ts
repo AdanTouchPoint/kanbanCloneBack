@@ -82,7 +82,7 @@ const tasksAfterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDo
         req,
       });
 
-      const urlWebhook = 'https://n8n-n8n.n4k6yy.easypanel.host/webhook-test/62ad72ab-865f-4893-80fa-1c55d686d916';
+      const urlWebhook = 'https://n8n-n8n.n4k6yy.easypanel.host/webhook/62ad72ab-865f-4893-80fa-1c55d686d916';
 
       for (const notif of notificaciones) {
         if (notif.tipo === 'tarea') {
