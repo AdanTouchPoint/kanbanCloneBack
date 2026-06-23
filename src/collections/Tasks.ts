@@ -83,7 +83,6 @@ const tasksAfterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDo
 
     if (checklistsAnadidos.length > 0) {
       const urlWebhook = 'https://n8n-n8n.n4k6yy.easypanel.host/webhook/62ad72ab-865f-4893-80fa-1c55d686d916';
-      const subtareasPorUsuario: { [userId: string]: { user: any; subtasks: any[] } } = {};
 
       for (const subId of checklistsAnadidos) {
         try {
@@ -101,67 +100,30 @@ const tasksAfterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDo
             if (miembro && typeof miembro === 'object') {
               const uId = (miembro as any).id || (miembro as any)._id;
               if (uId) {
-                const uIdStr = String(uId);
-                if (!subtareasPorUsuario[uIdStr]) {
-                  subtareasPorUsuario[uIdStr] = {
-                    user: miembro,
-                    subtasks: []
-                  };
-                }
-                subtareasPorUsuario[uIdStr].subtasks.push({
-                  id: populatedChecklist.id,
-                  name: populatedChecklist.name,
-                  due: populatedChecklist.due || 'unknown',
-                  state: populatedChecklist.state || 'unknown',
+                await fetch(urlWebhook, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    evento: 'colaborador_asignado',
+                    tipo: 'subtarea',
+                    subtask: {
+                      id: populatedChecklist.id,
+                      name: populatedChecklist.name,
+                      due: populatedChecklist.due || 'unknown',
+                      state: populatedChecklist.state || 'unknown',
+                      membersID: [miembro]
+                    },
+                    parentTask: {
+                      id: doc.id,
+                      name: doc.name
+                    }
+                  }),
                 });
               }
             }
           }
         } catch (subErr) {
-          console.error(`Error al procesar/agrupar subtarea ${subId}:`, subErr);
-        }
-      }
-
-      // Enviar una notificación por cada usuario con todas sus subtareas asignadas
-      for (const userId of Object.keys(subtareasPorUsuario)) {
-        const { user, subtasks } = subtareasPorUsuario[userId];
-        if (subtasks.length > 0) {
-          try {
-            const payload: any = {
-              evento: 'colaborador_asignado',
-              tipo: 'subtarea',
-              subtasks: subtasks.map(s => ({
-                id: s.id,
-                name: s.name,
-                due: s.due,
-                state: s.state,
-                membersID: [user]
-              })),
-              parentTask: {
-                id: doc.id,
-                name: doc.name
-              }
-            };
-
-            // Compatibilidad hacia atrás si solo hay una subtarea
-            if (subtasks.length === 1) {
-              payload.subtask = {
-                id: subtasks[0].id,
-                name: subtasks[0].name,
-                due: subtasks[0].due,
-                state: subtasks[0].state,
-                membersID: [user]
-              };
-            }
-
-            await fetch(urlWebhook, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload),
-            });
-          } catch (sendErr) {
-            console.error(`Error al enviar webhook de subtareas para usuario ${userId}:`, sendErr);
-          }
+          console.error(`Error al procesar/notificar subtarea ${subId}:`, subErr);
         }
       }
     }
