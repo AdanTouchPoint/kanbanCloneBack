@@ -22,16 +22,9 @@ const obtenerIdsMiembros = (membersData: any): string[] => {
 };
 
 const tasksAfterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDoc, req, operation }) => {
+  if (operation !== 'create' && operation !== 'update') return;
+
   try {
-    // Normalizamos subtareas para trabajar solo con objetos (descartamos strings)
-    const prevSubs = (previousDoc?.checkListsID || [])
-      .filter((s: any) => typeof s === 'object' && s !== null);
-    const currentSubs = (doc?.checkListsID || [])
-      .filter((s: any) => typeof s === 'object' && s !== null);
-
-    // Mapa de IDs previos de subtareas para detectar nuevas
-    const prevSubIds = new Set(prevSubs.map((s: any) => s.id));
-
     // Función que decide si se debe notificar un cambio en los miembros:
     // Se notifica si hay al menos un miembro nuevo (no presente antes) Y el array resultante no está vacío.
     const debeNotificar = (idsActuales: string[], idsAnteriores: string[]) => {
@@ -42,106 +35,41 @@ const tasksAfterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDo
       return idsActuales.some(id => !idsAnteriores.includes(id));
     };
 
-    const notificaciones: Array<{
-      tipo: 'tarea' | 'subtarea';
-      subtask?: any;    // solo para subtareas
-    }> = [];
-
-    // --- CASO TAREA PADRE ---
     const idsPadreActuales = obtenerIdsMiembros(doc?.membersID);
     const idsPadreAnteriores = obtenerIdsMiembros(previousDoc?.membersID);
 
     if (debeNotificar(idsPadreActuales, idsPadreAnteriores)) {
-      notificaciones.push({ tipo: 'tarea' });
-    }
-
-    // --- CASO SUBTAREAS ---
-    for (const sub of currentSubs) {
-      const prevSub = prevSubs.find((p: any) => p.id === sub.id);
-      const idsActuales = obtenerIdsMiembros(sub.membersID);
-      const idsAnteriores = prevSub ? obtenerIdsMiembros(prevSub.membersID) : [];
-
-      // Es una subtarea nueva (no existía antes) o una existente con cambio en miembros
-      if (!prevSub || debeNotificar(idsActuales, idsAnteriores)) {
-        if (idsActuales.length > 0) {
-          notificaciones.push({
-            tipo: 'subtarea',
-            subtask: sub, // solo necesitamos el ID y los datos básicos, luego poblaremos
-          });
-        }
-      }
-    }
-
-    // --- DISPARAR WEBHOOKS ---
-    if (notificaciones.length > 0) {
-      // Obtenemos la tarea populada una sola vez
+      // Obtenemos la tarea populada
       const populatedTask = await req.payload.findByID({
         collection: 'tasks',
         id: doc.id,
-        depth: 3, // para inflar los objetos de miembros y subtareas
+        depth: 2, // suficiente para inflar los objetos de miembros
         req,
       });
 
       const urlWebhook = 'https://n8n-n8n.n4k6yy.easypanel.host/webhook/62ad72ab-865f-4893-80fa-1c55d686d916';
 
-      for (const notif of notificaciones) {
-        if (notif.tipo === 'tarea') {
-          // Asegurar membersID como array
-          const miembros = Array.isArray(populatedTask.membersID)
-            ? populatedTask.membersID
-            : populatedTask.membersID
-            ? [populatedTask.membersID]
-            : [];
+      // Asegurar membersID como array
+      const miembros = Array.isArray(populatedTask.membersID)
+        ? populatedTask.membersID
+        : populatedTask.membersID
+        ? [populatedTask.membersID]
+        : [];
 
-          await fetch(urlWebhook, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              evento: 'colaborador_asignado',
-              tipo: 'tarea',
-              task: {
-                id: populatedTask.id,
-                name: populatedTask.name,
-                due: populatedTask.due,
-                membersID: miembros,
-              },
-            }),
-          });
-        } else {
-          // Subtarea: buscamos su versión populada en la tarea populada
-          const populatedSub = populatedTask.checkListsID?.find(
-            (s: any) => typeof s === 'object' && s.id === notif.subtask.id
-          ) as any;
-
-          if (populatedSub) {
-            const miembros = Array.isArray(populatedSub.membersID)
-              ? populatedSub.membersID
-              : populatedSub.membersID
-              ? [populatedSub.membersID]
-              : [];
-
-            await fetch(urlWebhook, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                evento: 'colaborador_asignado',
-                tipo: 'subtarea',
-                subtask: {
-                  id: populatedSub.id || 'unknown',
-                  name: populatedSub.name || 'unknown',
-                  due: populatedSub.due || 'unknown',
-                  state: populatedSub.state || 'unknown',
-                  membersID: miembros,
-                },
-                parentTask: {
-                  id: doc.id,
-                  name: doc.name,
-                },
-              }),
-            });
-          }
-        }
-      }
+      await fetch(urlWebhook, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          evento: 'colaborador_asignado',
+          tipo: 'tarea',
+          task: {
+            id: populatedTask.id,
+            name: populatedTask.name,
+            due: populatedTask.due,
+            membersID: miembros,
+          },
+        }),
+      });
     }
   } catch (error) {
     console.error('Error en hook afterChange de Tasks:', error);
