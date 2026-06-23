@@ -71,6 +71,54 @@ const tasksAfterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDo
         }),
       });
     }
+
+    // Identificar checklists añadidos a la tarea y enviar notificación si tienen colaboradores
+    const checklistsActuales = (doc?.checkListsID || []).map((c: any) =>
+      typeof c === 'object' && c !== null ? c.id || c._id : String(c)
+    ).filter(Boolean);
+    const checklistsAnteriores = (previousDoc?.checkListsID || []).map((c: any) =>
+      typeof c === 'object' && c !== null ? c.id || c._id : String(c)
+    ).filter(Boolean);
+    const checklistsAnadidos = checklistsActuales.filter((id: string) => !checklistsAnteriores.includes(id));
+
+    if (checklistsAnadidos.length > 0) {
+      const urlWebhook = 'https://n8n-n8n.n4k6yy.easypanel.host/webhook/62ad72ab-865f-4893-80fa-1c55d686d916';
+      for (const subId of checklistsAnadidos) {
+        try {
+          const populatedChecklist = await req.payload.findByID({
+            collection: 'checklists',
+            id: subId,
+            depth: 3,
+            req,
+          });
+
+          const idsMiembros = obtenerIdsMiembros(populatedChecklist.membersID);
+          if (idsMiembros.length > 0) {
+            await fetch(urlWebhook, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                evento: 'colaborador_asignado',
+                tipo: 'subtarea',
+                subtask: {
+                  id: populatedChecklist.id,
+                  name: populatedChecklist.name,
+                  due: populatedChecklist.due || 'unknown',
+                  state: populatedChecklist.state || 'unknown',
+                  membersID: populatedChecklist.membersID || []
+                },
+                parentTask: {
+                  id: doc.id,
+                  name: doc.name
+                }
+              }),
+            });
+          }
+        } catch (subErr) {
+          console.error(`Error al procesar notificación de subtarea ${subId}:`, subErr);
+        }
+      }
+    }
   } catch (error) {
     console.error('Error en hook afterChange de Tasks:', error);
   }
