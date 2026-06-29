@@ -25,13 +25,12 @@ const tasksAfterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDo
   if (operation !== 'create' && operation !== 'update') return;
 
   try {
-    // Función que decide si se debe notificar un cambio en los miembros:
-    // Se notifica si hay al menos un miembro nuevo (no presente antes) Y el array resultante no está vacío.
+    const urlWebhook = 'https://n8n-n8n.n4k6yy.easypanel.host/webhook/62ad72ab-865f-4893-80fa-1c55d686d916';
+
+    // --- SECCIÓN 1: NOTIFICACIÓN DE LA TAREA PADRE ---
     const debeNotificar = (idsActuales: string[], idsAnteriores: string[]) => {
       if (idsActuales.length === 0) return false;
-      // Si no hay anteriores (creación) y hay miembros -> sí
       if (idsAnteriores.length === 0) return true;
-      // Si hay al menos un ID nuevo que no estaba antes -> sí
       return idsActuales.some(id => !idsAnteriores.includes(id));
     };
 
@@ -39,17 +38,13 @@ const tasksAfterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDo
     const idsPadreAnteriores = obtenerIdsMiembros(previousDoc?.membersID);
 
     if (debeNotificar(idsPadreActuales, idsPadreAnteriores)) {
-      // Obtenemos la tarea populada
       const populatedTask = await req.payload.findByID({
         collection: 'tasks',
         id: doc.id,
-        depth: 2, // suficiente para inflar los objetos de miembros
+        depth: 2,
         req,
       });
 
-      const urlWebhook = 'https://n8n-n8n.n4k6yy.easypanel.host/webhook/62ad72ab-865f-4893-80fa-1c55d686d916';
-
-      // Asegurar membersID como array
       const miembros = Array.isArray(populatedTask.membersID)
         ? populatedTask.membersID
         : populatedTask.membersID
@@ -72,18 +67,27 @@ const tasksAfterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDo
       });
     }
 
-    // Identificar checklists añadidos a la tarea y enviar notificación agrupada por colaborador
-    const checklistsActuales = (doc?.checkListsID || []).map((c: any) =>
+    // --- SECCIÓN 2: CORRECCIÓN PARA LAS SUBTAREAS (CHECKLISTS) ---
+    // En lugar de confiar en 'doc', traemos la versión fresca y final de la base de datos
+    const freshDoc = await req.payload.findByID({
+      collection: 'tasks',
+      id: doc.id,
+      depth: 0, // No necesitamos popular aquí, solo los IDs limpios
+      req,
+    });
+
+    const checklistsActuales = (freshDoc?.checkListsID || []).map((c: any) =>
       typeof c === 'object' && c !== null ? c.id || c._id : String(c)
     ).filter(Boolean);
+
     const checklistsAnteriores = (previousDoc?.checkListsID || []).map((c: any) =>
       typeof c === 'object' && c !== null ? c.id || c._id : String(c)
     ).filter(Boolean);
+
     const checklistsAnadidos = checklistsActuales.filter((id: string) => !checklistsAnteriores.includes(id));
 
     if (checklistsAnadidos.length > 0) {
-      const urlWebhook = 'https://n8n-n8n.n4k6yy.easypanel.host/webhook/62ad72ab-865f-4893-80fa-1c55d686d916';
-
+      // PROCESAMOS TODAS LAS SUBTAREAS DETECTADAS
       for (const subId of checklistsAnadidos) {
         try {
           const populatedChecklist = await req.payload.findByID({
@@ -100,6 +104,7 @@ const tasksAfterChangeHook: CollectionAfterChangeHook = async ({ doc, previousDo
             if (miembro && typeof miembro === 'object') {
               const uId = (miembro as any).id || (miembro as any)._id;
               if (uId) {
+                // Ejecutamos el fetch y esperamos su resolución antes de avanzar a la siguiente subtarea
                 await fetch(urlWebhook, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
