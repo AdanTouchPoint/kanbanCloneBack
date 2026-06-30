@@ -88,6 +88,11 @@ export const Boards: CollectionConfig = {
       required: true,
     },
     {
+      name: 'ownerId',
+      type: 'relationship',
+      relationTo: 'users',
+    },
+    {
       name: 'membersID',
       type: 'relationship',
       relationTo: 'users',
